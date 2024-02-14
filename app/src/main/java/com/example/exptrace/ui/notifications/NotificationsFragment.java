@@ -3,6 +3,7 @@ package com.example.exptrace.ui.notifications;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -12,6 +13,11 @@ import android.widget.Button;
 
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
+import android.widget.TableLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+import android.widget.ImageView;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
@@ -34,17 +40,20 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
 public class NotificationsFragment extends Fragment {
 
     private FragmentNotificationsBinding binding;
     private Button b2;
     private Button b3;
+    private TextView tv2,tv4,tv6;
 
+    private TableLayout tl1;
 
-    NfcAdapter nfcAdapter;
-    PendingIntent pendingIntent;
-    Tag myTag;
-    Context context;
+    private ImageView iv1;
+
 
 
 
@@ -56,7 +65,13 @@ public class NotificationsFragment extends Fragment {
 
         b2 = root.findViewById(R.id.b2);
         b3 = root.findViewById(R.id.b3);
+        tl1 = root.findViewById(R.id.tl1);
+        tv2 = root.findViewById(R.id.tv2);
+        tv4 = root.findViewById(R.id.tv4);
+        tv6 = root.findViewById(R.id.tv6);
 
+
+        tl1.setVisibility(View.INVISIBLE);
         b2.setOnClickListener(v -> {
             scanCode();
         });
@@ -64,6 +79,8 @@ public class NotificationsFragment extends Fragment {
         b3.setOnClickListener(v -> {
             scanNFC();
         });
+
+
 
 
         return root;
@@ -78,12 +95,13 @@ public class NotificationsFragment extends Fragment {
         barLauncher.launch(options);
     }
 
-    private void scanNFC(){
-//        Placeholder text
-    }
 
     private ActivityResultLauncher<ScanOptions> barLauncher = registerForActivityResult(new ScanContract(), result -> {
         if (result.getContents() != null) {
+
+            // Make Table Visible
+            tl1.setVisibility(View.VISIBLE);
+
             // Extract UPC or EAN number from the barcode result
             String barcode = result.getContents();
 
@@ -108,9 +126,19 @@ public class NotificationsFragment extends Fragment {
                         // Parse the JSON response
                         JSONObject jsonResponse = new JSONObject(response.body().string());
 
-                        // Extract product information
-                        String productName = jsonResponse.optString("title");
-                        // You can extract more fields as needed
+                        // ID of Product
+                        int productID = Integer.parseInt(jsonResponse.optString("barcode"));
+
+                        // Alias Name of Product
+                        String productName = jsonResponse.optString("alias");
+
+                        // Date Added
+                        LocalDate localDate = LocalDate.now();
+                        DateTimeFormatter formatDate = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                        String dateNow = localDate.format(formatDate);
+
+                        // Image
+
 
                         // Display product information in AlertDialog
                         requireActivity().runOnUiThread(() -> {
@@ -132,6 +160,59 @@ public class NotificationsFragment extends Fragment {
             });
         }
     });
+
+    private void scanNFC(){
+        NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(requireContext());
+
+        if (nfcAdapter == null) {
+            // NFC is not supported on this device.
+            Toast.makeText(requireContext(), "NFC is not supported on this device", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Add FLAG_IMMUTABLE flag to PendingIntent
+        PendingIntent pendingIntent = PendingIntent.getActivity(requireContext(), 0,
+                new Intent(requireContext(), getActivity().getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        .putExtra("fromNFC", true), PendingIntent.FLAG_IMMUTABLE);
+
+        IntentFilter[] intentFiltersArray = new IntentFilter[]{
+                new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED),
+                new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED),
+                new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED)
+        };
+
+        String[][] techListsArray = new String[][]{};
+
+        nfcAdapter.enableForegroundDispatch(getActivity(), pendingIntent, intentFiltersArray, techListsArray);
+    }
+
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Enable NFC foreground dispatch when the activity is in the foreground
+        scanNFC();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Disable NFC foreground dispatch when the activity is paused
+        NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(requireContext());
+        if (nfcAdapter != null) {
+            nfcAdapter.disableForegroundDispatch(requireActivity());
+        }
+    }
+
+    public void handleNfcIntent(Intent intent) {
+        // Handle the NFC tag here
+        Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+        if (tag != null) {
+            Toast.makeText(requireContext(), "There is a tag"+ tag, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
 
     @Override
     public void onDestroyView() {
