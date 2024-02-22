@@ -191,7 +191,7 @@
 
             <!-- Second Column - Editable EditText -->
             <EditText
-                android:id="@+id/expDate"
+                android:id="@+id/et1"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
